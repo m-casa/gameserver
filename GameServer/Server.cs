@@ -18,6 +18,7 @@ namespace GameServer
         public static Dictionary<int, PacketHandler> packetHandlers;
 
         private static TcpListener tcpListener;
+        private static UdpClient udpListener;
 
         public static void Start(int _maxPlayers, int _port)
         {
@@ -34,6 +35,10 @@ namespace GameServer
             tcpListener.Start();
             // Accept any client that attempts to connect
             tcpListener.BeginAcceptTcpClient(new AsyncCallback(TCPConnectCallback), null);
+
+            udpListener = new UdpClient(port);
+            udpListener.BeginReceive(UDPReceiveCallback, null);
+
 
             Console.WriteLine($"Server started on {port}.");
         }
@@ -63,6 +68,70 @@ namespace GameServer
             Console.WriteLine($"{_client.Client.RemoteEndPoint} failed to connect: Server full!");
         }
 
+        private static void UDPReceiveCallback(IAsyncResult _result)
+        {
+            try
+            {
+                IPEndPoint _clientEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                // This method will not only return any bytes received, 
+                //  but will also set our IPEndPoint to the endpoint where the data came from
+                byte[] _data = udpListener.EndReceive(_result, ref _clientEndPoint);
+                udpListener.BeginReceive(UDPReceiveCallback, null);
+
+                // Might not have to disconnect, as it could be a common occurence that data is less than 4 bytes
+                if (_data.Length < 4)
+                {
+                    // TODO: disconnect
+                    return;
+                }
+
+                using (Packet _packet = new Packet(_data))
+                {
+                    int _clientId = _packet.ReadInt();
+
+                    // Make sure client id is not 0, as this id does not exist and can cause server crash
+                    if (_clientId == 0)
+                    {
+                        return;
+                    }
+
+                    // Check if the udp end point is null, which means this is a new connection
+                    //  and the packet received is the empty one that opens up the client's port
+                    if (clients[_clientId].udp.endPoint == null)
+                    {
+                        clients[_clientId].udp.Connect(_clientEndPoint);
+                        return;
+                    }
+
+                    // Check to make sure the endpoint we have stored for the client matches the client id of where the packet came from
+                    // Stops hackers from trying to impersonate another client
+                    if (clients[_clientId].udp.endPoint.ToString() == _clientEndPoint.ToString())
+                    {
+                        clients[_clientId].udp.HandleData(_packet);
+                    }
+                }
+            }
+            catch (Exception _ex)
+            {
+                Console.WriteLine($"Error receiving UDP data: {_ex}");
+            }
+        }
+
+        public static void SendUDPData(IPEndPoint _clientEndPoint, Packet _packet)
+        {
+            try
+            {
+                if (_clientEndPoint != null)
+                {
+                    udpListener.BeginSend(_packet.ToArray(), _packet.Length(), _clientEndPoint, null, null);
+                }
+            }
+            catch (Exception _ex)
+            {
+                Console.WriteLine($"Error sending data to {_clientEndPoint} via UDP: {_ex}");
+            }
+        }
+
         // Add clients to our dictionary
         private static void InitializeServerData()
         {
@@ -73,7 +142,8 @@ namespace GameServer
 
             packetHandlers = new Dictionary<int, PacketHandler> 
             {
-                { (int)ClientPackets.welcomeReceived, ServerHandle.WelcomeReceived }
+                { (int)ClientPackets.welcomeReceived, ServerHandle.WelcomeReceived },
+                { (int)ClientPackets.udpTestReceived, ServerHandle.UDPTestReceived }
             };
             Console.WriteLine("Initialized packets.");
         }

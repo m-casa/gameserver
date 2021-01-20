@@ -33,6 +33,37 @@ namespace GameServer
             }
         }
 
+        // Send data to specific client using udp
+        private static void SendUDPData(int _toClient, Packet _packet)
+        {
+            _packet.WriteLength();
+            Server.clients[_toClient].udp.SendData(_packet);
+        }
+
+        // Send data to all clients using udp
+        private static void SendUDPDataToAll(Packet _packet)
+        {
+            _packet.WriteLength();
+            for (int i = 1; i <= Server.maxPlayers; i++)
+            {
+                Server.clients[i].udp.SendData(_packet);
+            }
+        }
+
+        // Send data to all clients except a specific one using udp
+        private static void SendUDPDataToAll(int _exceptClient, Packet _packet)
+        {
+            _packet.WriteLength();
+            for (int i = 1; i <= Server.maxPlayers; i++)
+            {
+                if (i != _exceptClient)
+                {
+                    Server.clients[i].udp.SendData(_packet);
+                }
+            }
+        }
+
+        #region Packets
         // Send a welcome packet
         public static void Welcome(int _toClient, string _msg)
         {
@@ -45,5 +76,18 @@ namespace GameServer
                 SendTCPData(_toClient, _packet);
             }
         }
+
+        // Send test packet using udp
+        public static void UDPTest(int _toClient)
+        {
+            // Using automatically disposes for us when done
+            using (Packet _packet = new Packet((int)ServerPackets.udpTest))
+            {
+                _packet.Write("A test packet for UDP.");
+
+                SendUDPData(_toClient, _packet);
+            }
+        }
+        #endregion
     }
 }
