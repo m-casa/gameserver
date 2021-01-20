@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Numerics;
 
 namespace GameServer
 {
     class Client
     {
         public static int dataBufferSize = 4096;
-
+        public Player player;
         // Client unique id
         public int id;
         public TCP tcp;
@@ -173,7 +174,6 @@ namespace GameServer
             public void Connect(IPEndPoint _endPoint)
             {
                 endPoint = _endPoint;
-                ServerSend.UDPTest(id);
             }
 
             public void SendData(Packet _packet)
@@ -196,6 +196,33 @@ namespace GameServer
                         Server.packetHandlers[_packetId](id, _packet);
                     }
                 });
+            }
+        }
+
+        public void SendIntoGame(string _playerName)
+        {
+            player = new Player(id, _playerName, new Vector3(0, 0, 0));
+
+            // Use this loop to go through our server's dictionary of clients
+            // We'll use this to send the information of all other players already connected to our new player
+            foreach(Client _client in Server.clients.Values)
+            {
+                if (_client.player != null)
+                {
+                    if (_client.id != id)
+                    {
+                        ServerSend.SpawnPlayer(id, _client.player);
+                    }
+                }
+            }
+
+            // This loop will send information on our new player to all other players (including the new player)
+            foreach (Client _client in Server.clients.Values)
+            {
+                if (_client.player != null)
+                {
+                    ServerSend.SpawnPlayer(_client.id, player);
+                }
             }
         }
     }

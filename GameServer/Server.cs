@@ -11,6 +11,7 @@ namespace GameServer
         public static int port { get; private set; }
         // A new dictionary to keep track of our clients and their ids
         public static Dictionary<int, Client> clients = new Dictionary<int, Client>();
+
         // A delegate basically says "feel free to assign any method to this delegate if the signature matches"
         // Since our HandleData method has a "using" that matches the "Packet _packet" signature,
         //  we know that is where the packet is being handled, hence this delegate's name
@@ -143,7 +144,6 @@ namespace GameServer
             packetHandlers = new Dictionary<int, PacketHandler> 
             {
                 { (int)ClientPackets.welcomeReceived, ServerHandle.WelcomeReceived },
-                { (int)ClientPackets.udpTestReceived, ServerHandle.UDPTestReceived }
             };
             Console.WriteLine("Initialized packets.");
         }
