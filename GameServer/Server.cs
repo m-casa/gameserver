@@ -9,18 +9,22 @@ namespace GameServer
     {
         public static int maxPlayers { get; private set; }
         public static int port { get; private set; }
+
         // A new dictionary to keep track of our clients and their ids
         public static Dictionary<int, Client> clients = new Dictionary<int, Client>();
 
         // A delegate basically says "feel free to assign any method to this delegate if the signature matches"
-        // Since our HandleData method has a "using" that matches the "Packet _packet" signature,
+        // Since our HandleData methods in the Client class have a "using" that matches the "Packet _packet" signature,
         //  we know that is where the packet is being handled, hence this delegate's name
         public delegate void PacketHandler(int _fromClient, Packet _packet);
+
+        // A new dictionary to keep track of our packet handlers and their ids
         public static Dictionary<int, PacketHandler> packetHandlers;
 
         private static TcpListener tcpListener;
         private static UdpClient udpListener;
 
+        // Will start our server with the specified max players and port number
         public static void Start(int _maxPlayers, int _port)
         {
             maxPlayers = _maxPlayers;
@@ -30,24 +34,30 @@ namespace GameServer
 
             InitializeServerData();
 
-            // To listen in on the specified port for any IP Address trying to connect
+            // Will listen in on the specified port with TCP for any IP Address trying to connect
             tcpListener = new TcpListener(IPAddress.Any, port);
+
             // Start listening
             tcpListener.Start();
+
             // Accept any client that attempts to connect
             tcpListener.BeginAcceptTcpClient(new AsyncCallback(TCPConnectCallback), null);
 
+            // Will listen in on the specified port with UDP for any IP Address trying to connect
             udpListener = new UdpClient(port);
-            udpListener.BeginReceive(UDPReceiveCallback, null);
 
+            // Accept any client that attempts to connect
+            udpListener.BeginReceive(UDPReceiveCallback, null);
 
             Console.WriteLine($"Server started on {port}.");
         }
 
+        // Will handle a client connection through TCP
         private static void TCPConnectCallback(IAsyncResult _result)
         {
-            // Store our client connection attempt
+            // Store our client's connection attempt
             TcpClient _client = tcpListener.EndAcceptTcpClient(_result);
+
             // Continue listening for client connections
             tcpListener.BeginAcceptTcpClient(new AsyncCallback(TCPConnectCallback), null);
 
@@ -60,7 +70,8 @@ namespace GameServer
                 //  store our client's information through that socket
                 if (clients[i].tcp.socket == null)
                 {
-                    // _client and _socket are interchangeable names
+                    // Connect the client to the server using TCP
+                    // NOTE: _client and _socket are interchangeable names
                     clients[i].tcp.Connect(_client);
                     return;
                 }
@@ -69,17 +80,23 @@ namespace GameServer
             Console.WriteLine($"{_client.Client.RemoteEndPoint} failed to connect: Server full!");
         }
 
+        // Will handle a client connection through UDP
         private static void UDPReceiveCallback(IAsyncResult _result)
         {
             try
             {
+                // Initialize an IPEndPoint that will store our client's connection attempt
                 IPEndPoint _clientEndPoint = new IPEndPoint(IPAddress.Any, 0);
+
                 // This method will not only return any bytes received, 
                 //  but will also set our IPEndPoint to the endpoint where the data came from
                 byte[] _data = udpListener.EndReceive(_result, ref _clientEndPoint);
+
+                // Continue listening for client connections
                 udpListener.BeginReceive(UDPReceiveCallback, null);
 
-                // Might not have to disconnect, as it could be a common occurence that data is less than 4 bytes
+                // Disconnect the client if the data received is less than 4 bytes
+                // NOTE: Might not have to disconnect, as it could be a common occurence that data is less than 4 bytes
                 if (_data.Length < 4)
                 {
                     // TODO: disconnect
@@ -90,13 +107,13 @@ namespace GameServer
                 {
                     int _clientId = _packet.ReadInt();
 
-                    // Make sure client id is not 0, as this id does not exist and can cause server crash
+                    // Make sure the client's id is not 0, as this id does not exist and can cause a server crash
                     if (_clientId == 0)
                     {
                         return;
                     }
 
-                    // Check if the udp end point is null, which means this is a new connection
+                    // Check if the UDP endpoint is null, which means this is a new connection
                     //  and the packet received is the empty one that opens up the client's port
                     if (clients[_clientId].udp.endPoint == null)
                     {
@@ -108,6 +125,7 @@ namespace GameServer
                     // Stops hackers from trying to impersonate another client
                     if (clients[_clientId].udp.endPoint.ToString() == _clientEndPoint.ToString())
                     {
+                        // Pass our handlers any data that needs to be read
                         clients[_clientId].udp.HandleData(_packet);
                     }
                 }
@@ -118,6 +136,7 @@ namespace GameServer
             }
         }
 
+        // Sends UDP data to the client
         public static void SendUDPData(IPEndPoint _clientEndPoint, Packet _packet)
         {
             try
@@ -133,7 +152,9 @@ namespace GameServer
             }
         }
 
-        // Add clients to our dictionary
+        // Adds unassigned clients to our dictionary equal to the max number of players
+        // As actual players join the server, they will be assigned a client id from the dictionary
+        // Also initializes our packet handlers
         private static void InitializeServerData()
         {
             for (int i = 1; i <= maxPlayers; i++)

@@ -17,11 +17,13 @@ namespace GameServer
             Server.Start(10, 26950);
         }
 
+        // The main thread that will handle when to update the server
         private static void MainThread()
         {
             Console.WriteLine($"Main thread started. Running at {Constants.TICKS_PER_SEC} ticks per second.");
             DateTime _nextLoop = DateTime.Now;
 
+            // While the server is running
             while (isRunning)
             {
                 while (_nextLoop < DateTime.Now)

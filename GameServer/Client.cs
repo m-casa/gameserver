@@ -9,7 +9,6 @@ namespace GameServer
     {
         public static int dataBufferSize = 4096;
         public Player player;
-        // Client unique id
         public int id;
         public TCP tcp;
         public UDP udp;
@@ -21,9 +20,10 @@ namespace GameServer
             udp = new UDP(id);
         }
 
+        // TCP setup for the client
         public class TCP 
         {
-            // Will store instance we get in the server's connect callback
+            // Will store the instance we get in the server's TCP connect callback
             public TcpClient socket;
 
             private readonly int id;
@@ -37,9 +37,10 @@ namespace GameServer
                 id = _id;
             }
 
+            // Will store the connection of our new client to the server through TCP
             public void Connect(TcpClient _socket)
             {
-                // Prepare socket for how large data received and sent should be
+                // Prepare the socket for how large data received and sent should be
                 socket = _socket;
                 socket.ReceiveBufferSize = dataBufferSize;
                 socket.SendBufferSize = dataBufferSize;
@@ -47,16 +48,20 @@ namespace GameServer
                 // Grab our stream of data so we can begin reading
                 stream = socket.GetStream();
 
+                // Initialize a packet that we can store our data in
                 receivedData = new Packet();
-                // How large the data is that we can receive
+
+                // Set a limit of how much data we can receive
                 receiveBuffer = new byte[dataBufferSize];
 
                 // Begin reading from our stream of data
                 stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
 
+                // After we've received the client's connection data, send them a welcome packet
                 ServerSend.Welcome(id, "Welcome to the server!");
             }
 
+            // Sends TCP data to the client
             public void SendData(Packet _packet)
             {
                 try
@@ -72,28 +77,31 @@ namespace GameServer
                 }
             }
 
+            // Prepares our received data to be read
             private void ReceiveCallback(IAsyncResult _result)
             {
                 try
                 {
-                    // The size of the data represented as an int
+                    // The size of the data received represented as an int
                     int _byteLength = stream.EndRead(_result);
 
-                    // If there is no data we would disconnect
+                    // If there was no data received then disconnect
                     if (_byteLength <= 0)
                     {
                         // TODO: disconnect
                         return;
                     }
 
-                    // A new array for storing data; Size is based on what we received
+                    // A new array for storing data from the client; Size is based on what we received as an int
                     byte[] _data = new byte[_byteLength];
+
                     // Copy the data we received to the _data byte array
                     Array.Copy(receiveBuffer, _data, _byteLength);
 
+                    // HandleData will let use know when to reset the packet instance to reuse it for more data
                     receivedData.Reset(HandleData(_data));
 
-                    // Continue reading data from the stream
+                    // Continue reading any data left in the stream
                     stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
                 }
                 catch (Exception _ex)
@@ -106,44 +114,52 @@ namespace GameServer
             // Determine whether or not we have handled all data
             private bool HandleData(byte[] _data)
             {
+                // Initialize a variable that will hold the length of our packet
                 int _packetLength = 0;
 
+                // Stores the data received in a packet as bytes
                 receivedData.SetBytes(_data);
 
-                // Check if receivedData has 4 or more unread bytes, which indicates we have the start of one of our packets
-                // An int consists of 4 bytes, and the first data of any packet is an int which represents its length
+                // Check if receivedData (our packet) has 4 or more unread bytes, which indicates the start of our packet
+                // An int consists of 4 bytes; This data is always at the beginning of a packet and represents its length
                 if (receivedData.UnreadLength() >= 4)
                 {
+                    // Since the beginning of the data is greater than or equal to 4 bytes, read its int for our packet's length
                     _packetLength = receivedData.ReadInt();
-                    // If there is no more data then reset the received data
+
+                    // If there is no more data, then HandleData returns true which allows the packet to be reset and reused
                     if (_packetLength <= 0)
                     {
                         return true;
                     }
                 }
 
-                // If we still have data to read, and we have enough room to read that data
+                // If we still have data to read, and we have enough room to read that data, 
                 //  then continue receiving the next complete packet
                 while (_packetLength > 0 && _packetLength <= receivedData.UnreadLength())
                 {
                     // Store the bytes of the packet into a new byte array
                     byte[] _packetBytes = receivedData.ReadBytes(_packetLength);
-                    // Since our code won't be run on the same thread, execute it on main thread
+
+                    // Since our code won't be run on the same thread, execute it on the main thread
                     ThreadManager.ExecuteOnMainThread(() =>
                     {
                         using (Packet _packet = new Packet(_packetBytes))
                         {
                             int _packetId = _packet.ReadInt();
+
                             // Pass our handler a packet
                             Server.packetHandlers[_packetId](id, _packet);
                         }
                     });
 
+                    // Reset the packet length variable and determine if we will begin receiving the next complete packet
                     _packetLength = 0;
                     if (receivedData.UnreadLength() >= 4)
                     {
                         _packetLength = receivedData.ReadInt();
-                        // If there is no more data then reset the received data
+
+                        // If there is no more data, then HandleData returns true which allows the packet to be reset and reused
                         if (_packetLength <= 0)
                         {
                             return true;
@@ -160,8 +176,10 @@ namespace GameServer
             }
         }
 
+        // UDP setup for the client
         public class UDP
         {
+            // Will store the instance we get in the server's UDP connect callback
             public IPEndPoint endPoint;
 
             public int id;
@@ -171,40 +189,48 @@ namespace GameServer
                 id = _id;
             }
 
+            // Will store the connection of our new client to the server through UDP
             public void Connect(IPEndPoint _endPoint)
             {
                 endPoint = _endPoint;
             }
 
+            // Calls a method to send UDP data to the client
             public void SendData(Packet _packet)
             {
                 Server.SendUDPData(endPoint, _packet);
             }
 
+            // Handle the data packets received from the client
             public void HandleData(Packet _packetData)
             {
-                // Read out the packet length
+                // Read out the current packet's length
                 int _packetLength = _packetData.ReadInt();
-                // Read out the specified amount of bytes from the length into the data variable
+
+                // Read out the specified amount of bytes from the packet's length into the data variable
                 byte[] _packetBytes = _packetData.ReadBytes(_packetLength);
 
+                // Since our code won't be run on the same thread, execute it on the main thread
                 ThreadManager.ExecuteOnMainThread(() =>
                 {
                     using (Packet _packet = new Packet(_packetBytes))
                     {
                         int _packetId = _packet.ReadInt();
+
+                        // Pass our handler a packet
                         Server.packetHandlers[_packetId](id, _packet);
                     }
                 });
             }
         }
 
+        // Send our connected player into every client's game
         public void SendIntoGame(string _playerName)
         {
             player = new Player(id, _playerName, new Vector3(0, 0, 0));
 
             // Use this loop to go through our server's dictionary of clients
-            // We'll use this to send the information of all other players already connected to our new player
+            // We'll use this dictionary to send the information of all other connected players to our new player
             foreach(Client _client in Server.clients.Values)
             {
                 if (_client.player != null)
@@ -216,7 +242,7 @@ namespace GameServer
                 }
             }
 
-            // This loop will send information on our new player to all other players (including the new player)
+            // Use this loop to send information on our new player to all other connected players (including the new player)
             foreach (Client _client in Server.clients.Values)
             {
                 if (_client.player != null)

@@ -7,7 +7,7 @@ namespace GameServer
         // Read the packet letting us know the welcome was received
         public static void WelcomeReceived(int _fromClient, Packet _packet)
         {
-            // Read in the same order as what is being sent
+            // Read in the same order as what was sent
             int _clientIdCheck = _packet.ReadInt();
             string _username = _packet.ReadString();
 
