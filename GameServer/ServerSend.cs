@@ -64,7 +64,7 @@ namespace GameServer
         }
 
         #region Packets
-        // Send a welcome packet
+        // Sends a welcome packet
         public static void Welcome(int _toClient, string _msg)
         {
             // "Using" automatically disposes the packet for us when it's done being used
@@ -77,7 +77,7 @@ namespace GameServer
             }
         }
 
-        // Send a packet to the client with their player's spawn position information
+        // Sends a packet to the client with player spawn position information
         public static void SpawnPlayer(int _toClient, Player _player)
         {
             using (Packet _packet = new Packet((int)ServerPackets.spawnPlayer))
@@ -88,6 +88,30 @@ namespace GameServer
                 _packet.Write(_player.rotation);
 
                 SendTCPData(_toClient, _packet);
+            }
+        }
+
+        // Sends a packet to the client with player position information
+        public static void PlayerPosition(Player _player)
+        {
+            using (Packet _packet = new Packet((int)ServerPackets.playerPosition))
+            {
+                _packet.Write(_player.id);
+                _packet.Write(_player.position);
+
+                SendUDPDataToAll(_packet);
+            }
+        }
+
+        // Sends a packet to the client with player rotation information
+        public static void PlayerRotation(Player _player)
+        {
+            using (Packet _packet = new Packet((int)ServerPackets.playerRotation))
+            {
+                _packet.Write(_player.id);
+                _packet.Write(_player.rotation);
+
+                SendUDPDataToAll(_player.id, _packet);
             }
         }
         #endregion
