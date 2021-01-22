@@ -162,6 +162,7 @@ namespace GameServer
                 clients.Add(i, new Client(i));
             }
 
+            // These packets are for receiving
             packetHandlers = new Dictionary<int, PacketHandler> 
             {
                 { (int)ClientPackets.welcomeReceived, ServerHandle.WelcomeReceived },

@@ -13,10 +13,14 @@ namespace GameServer
         public string username;
 
         public Vector3 position;
+        public Vector3 moveDirection;
         public Quaternion rotation;
 
-        private float moveSpeed = 5f / Constants.TICKS_PER_SEC;
-        private bool[] inputs;
+        // If moving the player by server, divide the desired speed by the tick rate
+        // Dividing by the tick rate has the same effect as multiplying speed by Time.deltaTime
+        // private float moveSpeed = 5f / Constants.TICKS_PER_SEC;
+
+        private float[] inputs;
 
         public Player(int _id, string _username, Vector3 _spawnPosition)
         {
@@ -25,48 +29,40 @@ namespace GameServer
             position = _spawnPosition;
             rotation = Quaternion.Identity;
 
-            inputs = new bool[4];
+            inputs = new float[3];
         }
 
         // Will be used similarly to Unity's update method 
         public void Update()
         {
-            Vector2 _inputDirection = Vector2.Zero;
-            if (inputs[0])
+            Vector3 _moveDirection = Vector3.Zero;
+            if (inputs[0] != 0)
             {
-                _inputDirection.Y += 1;
+                _moveDirection.X = inputs[0];
             }
-            if (inputs[1])
+            if (inputs[1] != 0)
             {
-                _inputDirection.Y -= 1;
+                _moveDirection.Y = inputs[1];
             }
-            if (inputs[2])
+            if (inputs[2] != 0)
             {
-                _inputDirection.X += 1;
-            }
-            if (inputs[3])
-            {
-                _inputDirection.X -= 1;
+                _moveDirection.Z = inputs[2];
             }
 
-            Move(_inputDirection);
+            Move(_moveDirection);
         }
 
         // Sends this player's inputs to all clients
-        private void Move(Vector2 _inputDirection)
+        private void Move(Vector3 _moveDirection)
         {
-            Vector3 _forward = Vector3.Transform(new Vector3(0, 0, 1), rotation);
-            Vector3 _right = Vector3.Normalize(Vector3.Cross(_forward, new Vector3(0, 1, 0)));
+            moveDirection = _moveDirection;
 
-            Vector3 _moveDirection = _right * _inputDirection.X + _forward * _inputDirection.Y;
-            position += _moveDirection * moveSpeed;
-
-            ServerSend.PlayerPosition(this);
+            ServerSend.PlayerInput(this);
             ServerSend.PlayerRotation(this);
         }
 
         // Stores this player's inputs to the server
-        public void SetInput(bool[] _inputs, Quaternion _rotation)
+        public void SetInput(float[] _inputs, Quaternion _rotation)
         {
             inputs = _inputs;
             rotation = _rotation;

@@ -114,6 +114,18 @@ namespace GameServer
                 SendUDPDataToAll(_player.id, _packet);
             }
         }
+
+        // Sends a packet to the client with player input information
+        public static void PlayerInput(Player _player)
+        {
+            using (Packet _packet = new Packet((int)ServerPackets.playerInput))
+            {
+                _packet.Write(_player.id);
+                _packet.Write(_player.moveDirection);
+
+                SendUDPDataToAll(_packet);
+            }
+        }
         #endregion
     }
 }
