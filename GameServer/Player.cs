@@ -67,5 +67,12 @@ namespace GameServer
             inputs = _inputs;
             rotation = _rotation;
         }
+
+        // Stores this player's position in the server
+        public void SetPosition(float[] _position, Quaternion _rotation)
+        {
+            position = new Vector3(_position[0], _position[1], _position[2]);
+            rotation = _rotation;
+        }
     }
 }

@@ -88,7 +88,7 @@ namespace GameServer
                     // If there was no data received then disconnect
                     if (_byteLength <= 0)
                     {
-                        // TODO: disconnect
+                        Server.clients[id].Disconnect();
                         return;
                     }
 
@@ -107,7 +107,7 @@ namespace GameServer
                 catch (Exception _ex)
                 {
                     Console.WriteLine($"Error receiving TCP data: {_ex}");
-                    // TODO: disconnect
+                    Server.clients[id].Disconnect();
                 }
             }
 
@@ -174,6 +174,16 @@ namespace GameServer
 
                 return false;
             }
+
+            // Close out our connection with the client through TCP
+            public void Disconnect()
+            {
+                socket.Close();
+                stream = null;
+                receivedData = null;
+                receiveBuffer = null;
+                socket = null;
+            }
         }
 
         // UDP setup for the client
@@ -222,6 +232,12 @@ namespace GameServer
                     }
                 });
             }
+
+            // Close out our connection with the client through UDP
+            public void Disconnect()
+            {
+                endPoint = null;
+            }
         }
 
         // Send our connected player into every client's game
@@ -250,6 +266,17 @@ namespace GameServer
                     ServerSend.SpawnPlayer(_client.id, player);
                 }
             }
+        }
+
+        // Disconnect the client's TCP and UDP instance
+        private void Disconnect()
+        {
+            Console.WriteLine($"{tcp.socket.Client.RemoteEndPoint} has disconnected.");
+
+            player = null;
+
+            tcp.Disconnect();
+            udp.Disconnect();
         }
     }
 }
